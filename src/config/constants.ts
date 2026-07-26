@@ -33,3 +33,19 @@ export const TEMPLATE_TYPES = {
 } as const;
 
 export type TemplateType = (typeof TEMPLATE_TYPES)[keyof typeof TEMPLATE_TYPES];
+
+export const AUTO_LIGHTWEIGHT_DELAY_MINUTES = {
+  MIN: 1,
+  MAX: 1440,
+  DEFAULT: 10,
+} as const;
+
+export function normalizeAutoLightweightDelayMinutes(value: number): number {
+  if (!Number.isFinite(value)) {
+    return AUTO_LIGHTWEIGHT_DELAY_MINUTES.DEFAULT;
+  }
+  return Math.min(
+    AUTO_LIGHTWEIGHT_DELAY_MINUTES.MAX,
+    Math.max(AUTO_LIGHTWEIGHT_DELAY_MINUTES.MIN, Math.trunc(value)),
+  );
+}

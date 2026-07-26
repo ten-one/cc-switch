@@ -346,6 +346,10 @@ export interface Settings {
   showInTray: boolean;
   // 点击关闭按钮时是否最小化到托盘而不是关闭应用
   minimizeToTrayOnClose: boolean;
+  // 隐藏到托盘一段时间后自动销毁主窗口并进入轻量模式
+  autoLightweightMode?: boolean;
+  // 自动进入轻量模式前的等待分钟数（1-1440）
+  autoLightweightDelayMinutes?: number;
   // 是否启用应用级窗口控制按钮（最小化/最大化/关闭）
   useAppWindowControls?: boolean;
   // 启用 Claude 插件联动（写入 ~/.claude/config.json 的 primaryApiKey）

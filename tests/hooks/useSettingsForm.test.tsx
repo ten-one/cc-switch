@@ -50,6 +50,8 @@ describe("useSettingsForm Hook", () => {
     const settings = result.current.settings!;
     expect(settings.showInTray).toBe(true);
     expect(settings.minimizeToTrayOnClose).toBe(true);
+    expect(settings.autoLightweightMode).toBe(false);
+    expect(settings.autoLightweightDelayMinutes).toBe(10);
     expect(settings.enableClaudePluginIntegration).toBe(false);
     expect(settings.claudeConfigDir).toBe("/Users/demo");
     expect(settings.codexConfigDir).toBeUndefined();
@@ -63,6 +65,8 @@ describe("useSettingsForm Hook", () => {
       data: {
         showInTray: true,
         minimizeToTrayOnClose: true,
+        autoLightweightMode: true,
+        autoLightweightDelayMinutes: 9999,
         enableClaudePluginIntegration: false,
         claudeConfigDir: "/Users/demo",
         codexConfigDir: null,
@@ -75,6 +79,8 @@ describe("useSettingsForm Hook", () => {
 
     await waitFor(() => {
       expect(result.current.settings?.language).toBe("ja");
+      expect(result.current.settings?.autoLightweightMode).toBe(true);
+      expect(result.current.settings?.autoLightweightDelayMinutes).toBe(1440);
     });
 
     expect(result.current.initialLanguage).toBe("ja");

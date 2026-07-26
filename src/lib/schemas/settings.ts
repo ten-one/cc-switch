@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AUTO_LIGHTWEIGHT_DELAY_MINUTES } from "@/config/constants";
 
 const directorySchema = z
   .string()
@@ -11,6 +12,13 @@ export const settingsSchema = z.object({
   // 设备级 UI 设置
   showInTray: z.boolean(),
   minimizeToTrayOnClose: z.boolean(),
+  autoLightweightMode: z.boolean().optional(),
+  autoLightweightDelayMinutes: z
+    .number()
+    .int()
+    .min(AUTO_LIGHTWEIGHT_DELAY_MINUTES.MIN)
+    .max(AUTO_LIGHTWEIGHT_DELAY_MINUTES.MAX)
+    .optional(),
   enableClaudePluginIntegration: z.boolean().optional(),
   skipClaudeOnboarding: z.boolean().optional(),
   launchOnStartup: z.boolean().optional(),
