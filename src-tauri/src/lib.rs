@@ -72,10 +72,14 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use std::{fmt, sync::Arc};
 #[cfg(target_os = "macos")]
 use tauri::image::Image;
-use tauri::tray::{TrayIconBuilder, TrayIconEvent};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::RunEvent;
 use tauri::{Emitter, Manager};
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
+
+fn should_show_main_on_tray_click(button: MouseButton, button_state: MouseButtonState) -> bool {
+    matches!((button, button_state), (MouseButton::Left, MouseButtonState::Up))
+}
 
 #[cfg(target_os = "windows")]
 fn set_windows_app_user_model_id(app: &tauri::AppHandle) {
@@ -1037,10 +1041,24 @@ pub fn run() {
             let mut tray_builder = TrayIconBuilder::with_id(tray::TRAY_ID)
                 .tooltip("CC Switch") // 鼠标悬停提示
                 .on_tray_icon_event(|tray, event| match event {
+                    TrayIconEvent::Click {
+                        button,
+                        button_state,
+                        ..
+                    } => {
+                        let app = tray.app_handle().clone();
+                        let refresh_app = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            crate::tray::refresh_all_usage_in_tray(&refresh_app).await;
+                        });
+                        if should_show_main_on_tray_click(button, button_state) {
+                            crate::tray::show_main_window(&app);
+                        }
+                    }
                     // 鼠标悬停/点击到托盘图标时，后台异步刷新用量缓存，
                     // 让用户下一次（或快速打开菜单的那一刻）看到较新的数字。
                     // refresh_all_usage_in_tray 内部有 10 秒防抖。
-                    TrayIconEvent::Enter { .. } | TrayIconEvent::Click { .. } => {
+                    TrayIconEvent::Enter { .. } => {
                         let app = tray.app_handle().clone();
                         tauri::async_runtime::spawn(async move {
                             crate::tray::refresh_all_usage_in_tray(&app).await;
@@ -1052,7 +1070,7 @@ pub fn run() {
                 .on_menu_event(|app, event| {
                     tray::handle_tray_menu_event(app, &event.id.0);
                 })
-                .show_menu_on_left_click(true);
+                .show_menu_on_left_click(false);
 
             // 使用平台对应的托盘图标（macOS 使用模板图标适配深浅色）
             #[cfg(target_os = "macos")]
@@ -2201,9 +2219,17 @@ mod tests {
     use super::{
         classify_exit_request, enabled_proxy_apps_on_startup, redact_url_for_log,
         redact_url_for_log_with_secrets, redact_url_origin_for_log, runtime_log_level_allows,
-        ExitRequestAction,
+        should_show_main_on_tray_click, ExitRequestAction,
     };
     use crate::database::Database;
+    use tauri::tray::{MouseButton, MouseButtonState};
+
+    #[test]
+    fn only_left_button_release_opens_main_window() {
+        assert!(should_show_main_on_tray_click(MouseButton::Left, MouseButtonState::Up));
+        assert!(!should_show_main_on_tray_click(MouseButton::Left, MouseButtonState::Down));
+        assert!(!should_show_main_on_tray_click(MouseButton::Right, MouseButtonState::Up));
+    }
 
     #[test]
     fn log_url_redaction_strips_credentials_and_query_keeps_path() {
