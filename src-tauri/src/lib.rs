@@ -78,7 +78,10 @@ use tauri::{Emitter, Manager};
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
 fn should_show_main_on_tray_click(button: MouseButton, button_state: MouseButtonState) -> bool {
-    matches!((button, button_state), (MouseButton::Left, MouseButtonState::Up))
+    matches!(
+        (button, button_state),
+        (MouseButton::Left, MouseButtonState::Up)
+    )
 }
 
 #[cfg(target_os = "windows")]
@@ -2226,9 +2229,18 @@ mod tests {
 
     #[test]
     fn only_left_button_release_opens_main_window() {
-        assert!(should_show_main_on_tray_click(MouseButton::Left, MouseButtonState::Up));
-        assert!(!should_show_main_on_tray_click(MouseButton::Left, MouseButtonState::Down));
-        assert!(!should_show_main_on_tray_click(MouseButton::Right, MouseButtonState::Up));
+        assert!(should_show_main_on_tray_click(
+            MouseButton::Left,
+            MouseButtonState::Up
+        ));
+        assert!(!should_show_main_on_tray_click(
+            MouseButton::Left,
+            MouseButtonState::Down
+        ));
+        assert!(!should_show_main_on_tray_click(
+            MouseButton::Right,
+            MouseButtonState::Up
+        ));
     }
 
     #[test]
