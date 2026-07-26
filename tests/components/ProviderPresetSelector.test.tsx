@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { TFunction } from "i18next";
@@ -113,9 +113,11 @@ function getIds(entries: ReadonlyArray<{ id: string }>) {
 function renderSelector({
   entries = presetEntries,
   onPresetChange = vi.fn(),
+  expanded = true,
 }: {
   entries?: TestPresetEntry[];
   onPresetChange?: (value: string) => void;
+  expanded?: boolean;
 } = {}) {
   const Wrapper = () => {
     const form = useForm();
@@ -132,7 +134,11 @@ function renderSelector({
     );
   };
 
-  return render(<Wrapper />);
+  const result = render(<Wrapper />);
+  if (expanded) {
+    fireEvent.click(getPresetSectionTrigger());
+  }
+  return result;
 }
 
 function getPresetButtonTexts() {
@@ -165,6 +171,12 @@ function getSortButton() {
 function getSearchInput() {
   return screen.getByRole("textbox", {
     name: /providerPreset\.(searchInput|searchPlaceholder)|搜索预设|search/i,
+  });
+}
+
+function getPresetSectionTrigger() {
+  return screen.getByRole("button", {
+    name: /providerPreset\.label|预设供应商|preset providers?/i,
   });
 }
 
@@ -324,6 +336,85 @@ describe("ProviderPresetSelector pure helpers", () => {
 });
 
 describe("ProviderPresetSelector", () => {
+  it("默认折叠，展开后才显示工具栏、预设列表和提示", async () => {
+    const user = userEvent.setup();
+    renderSelector({ expanded: false });
+
+    const trigger = getPresetSectionTrigger();
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "Beta Gateway" })).toBeNull();
+    expect(screen.queryByText(/选择预设后|providerPreset\.hint/i)).toBeNull();
+    expect(
+      screen.queryByRole("button", {
+        name: /providerPreset\.(sort|sortByName)|sort/i,
+      }),
+    ).toBeNull();
+
+    await user.click(trigger);
+
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(getSortButton()).toBeInTheDocument();
+    expect(getSearchButton()).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Beta Gateway" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/选择预设后|providerPreset\.hint/i),
+    ).toBeInTheDocument();
+  });
+
+  it("工具栏靠左并按排序、搜索、搜索框的顺序排列", async () => {
+    const user = userEvent.setup();
+    renderSelector();
+
+    const sortButton = getSortButton();
+    const searchButton = getSearchButton();
+    await user.click(searchButton);
+    const searchInput = getSearchInput();
+
+    expect(sortButton.parentElement).toBe(searchButton.parentElement);
+    expect(searchButton.parentElement).toBe(searchInput.parentElement);
+    expect(sortButton.parentElement).toHaveClass("flex-wrap");
+    expect(
+      sortButton.compareDocumentPosition(searchButton) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      searchButton.compareDocumentPosition(searchInput) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("折叠时关闭并清空搜索，再次展开恢复完整列表但保留排序模式", async () => {
+    const user = userEvent.setup();
+    renderSelector();
+
+    await user.click(getSortButton());
+    await user.click(getSearchButton());
+    await user.type(getSearchInput(), "gateway");
+    expect(
+      screen.queryByRole("button", { name: "preset.gamma" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(getPresetSectionTrigger());
+    expect(getPresetSectionTrigger()).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+
+    await user.click(getPresetSectionTrigger());
+    expect(getSortButton()).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "preset.gamma" }),
+    ).toBeInTheDocument();
+    expect(getPresetButtonTexts()).toEqual([
+      "providerPreset.custom",
+      "Beta Gateway",
+      "Delta Mirror",
+      "preset.alpha",
+      "preset.gamma",
+    ]);
+  });
+
   it("默认（original 模式）将官方分类置顶，非赞助商按显示名排序", () => {
     renderSelector();
 
@@ -518,9 +609,9 @@ describe("ProviderPresetSelector", () => {
     ).toBeInTheDocument();
   });
 
-  it("按 Ctrl+F 快捷键打开搜索输入框", async () => {
+  it("折叠状态按 Ctrl+F 自动展开并聚焦搜索输入框", async () => {
     const user = userEvent.setup();
-    renderSelector();
+    renderSelector({ expanded: false });
 
     // 初始没有搜索输入框
     expect(
@@ -528,10 +619,12 @@ describe("ProviderPresetSelector", () => {
         name: /providerPreset\.(searchInput|searchPlaceholder)|搜索预设|search/i,
       }),
     ).not.toBeInTheDocument();
+    expect(getPresetSectionTrigger()).toHaveAttribute("aria-expanded", "false");
 
-    // 按 Ctrl+F 展开输入框
+    // 按 Ctrl+F 展开预设区域并打开搜索输入框
     await user.keyboard("{Control>}f{/Control}");
-    expect(getSearchInput()).toBeInTheDocument();
+    expect(getPresetSectionTrigger()).toHaveAttribute("aria-expanded", "true");
+    await waitFor(() => expect(getSearchInput()).toHaveFocus());
   });
 
   it("搜索后点击预设按钮可选中预设且不清空搜索关键词", async () => {
@@ -586,6 +679,7 @@ describe("ProviderPresetSelector", () => {
     };
     render(<Wrapper />);
 
+    await user.click(getPresetSectionTrigger());
     await user.click(getSearchButton());
     await user.type(getSearchInput(), "gateway");
     expect(getSearchInput()).toBeInTheDocument();
