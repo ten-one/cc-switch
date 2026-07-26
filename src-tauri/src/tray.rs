@@ -940,6 +940,7 @@ pub fn apply_tray_policy(app: &tauri::AppHandle, dock_visible: bool) {
 
 /// 显示并聚焦主窗口；轻量模式下则重建主窗口。
 pub fn show_main_window(app: &tauri::AppHandle) {
+    crate::lightweight::cancel_scheduled_auto_enter();
     if let Some(window) = app.get_webview_window("main") {
         #[cfg(target_os = "windows")]
         {

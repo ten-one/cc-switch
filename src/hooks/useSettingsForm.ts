@@ -2,11 +2,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSettingsQuery } from "@/lib/query";
 import type { Settings } from "@/types";
+import {
+  AUTO_LIGHTWEIGHT_DELAY_MINUTES,
+  normalizeAutoLightweightDelayMinutes,
+} from "@/config/constants";
 
 type Language = "zh" | "zh-TW" | "en" | "ja";
 
-export type SettingsFormState = Omit<Settings, "language"> & {
+export type SettingsFormState = Omit<
+  Settings,
+  "language" | "autoLightweightMode" | "autoLightweightDelayMinutes"
+> & {
   language: Language;
+  autoLightweightMode: boolean;
+  autoLightweightDelayMinutes: number;
 };
 
 const normalizeLanguage = (lang?: string | null): Language => {
@@ -111,6 +120,11 @@ export function useSettingsForm(): UseSettingsFormResult {
       ...data,
       showInTray: data.showInTray ?? true,
       minimizeToTrayOnClose: data.minimizeToTrayOnClose ?? true,
+      autoLightweightMode: data.autoLightweightMode ?? false,
+      autoLightweightDelayMinutes: normalizeAutoLightweightDelayMinutes(
+        data.autoLightweightDelayMinutes ??
+          AUTO_LIGHTWEIGHT_DELAY_MINUTES.DEFAULT,
+      ),
       useAppWindowControls: data.useAppWindowControls ?? false,
       enableClaudePluginIntegration:
         data.enableClaudePluginIntegration ?? false,
@@ -141,6 +155,8 @@ export function useSettingsForm(): UseSettingsFormResult {
           ({
             showInTray: true,
             minimizeToTrayOnClose: true,
+            autoLightweightMode: false,
+            autoLightweightDelayMinutes: AUTO_LIGHTWEIGHT_DELAY_MINUTES.DEFAULT,
             useAppWindowControls: false,
             enableClaudePluginIntegration: false,
             skipClaudeOnboarding: false,
@@ -178,6 +194,11 @@ export function useSettingsForm(): UseSettingsFormResult {
         ...serverData,
         showInTray: serverData.showInTray ?? true,
         minimizeToTrayOnClose: serverData.minimizeToTrayOnClose ?? true,
+        autoLightweightMode: serverData.autoLightweightMode ?? false,
+        autoLightweightDelayMinutes: normalizeAutoLightweightDelayMinutes(
+          serverData.autoLightweightDelayMinutes ??
+            AUTO_LIGHTWEIGHT_DELAY_MINUTES.DEFAULT,
+        ),
         useAppWindowControls: serverData.useAppWindowControls ?? false,
         enableClaudePluginIntegration:
           serverData.enableClaudePluginIntegration ?? false,

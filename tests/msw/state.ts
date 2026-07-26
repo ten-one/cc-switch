@@ -96,6 +96,8 @@ let liveProviderIds: LiveProviderIdsByApp = {
 let settingsState: Settings = {
   showInTray: true,
   minimizeToTrayOnClose: true,
+  autoLightweightMode: false,
+  autoLightweightDelayMinutes: 10,
   enableClaudePluginIntegration: false,
   claudeConfigDir: "/default/claude",
   codexConfigDir: "/default/codex",
@@ -215,6 +217,8 @@ export const resetProviderState = () => {
   settingsState = {
     showInTray: true,
     minimizeToTrayOnClose: true,
+    autoLightweightMode: false,
+    autoLightweightDelayMinutes: 10,
     enableClaudePluginIntegration: false,
     claudeConfigDir: "/default/claude",
     codexConfigDir: "/default/codex",

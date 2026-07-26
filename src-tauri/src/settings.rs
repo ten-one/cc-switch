@@ -346,6 +346,12 @@ pub struct AppSettings {
     pub show_in_tray: bool,
     #[serde(default = "default_minimize_to_tray_on_close")]
     pub minimize_to_tray_on_close: bool,
+    /// 关闭主窗口并隐藏到托盘后，是否自动进入轻量模式
+    #[serde(default)]
+    pub auto_lightweight_mode: bool,
+    /// 自动进入轻量模式前的等待分钟数
+    #[serde(default = "default_auto_lightweight_delay_minutes")]
+    pub auto_lightweight_delay_minutes: u32,
     #[serde(default)]
     pub use_app_window_controls: bool,
     /// 是否启用 Claude 插件联动
@@ -498,6 +504,14 @@ fn default_minimize_to_tray_on_close() -> bool {
     true
 }
 
+pub const MIN_AUTO_LIGHTWEIGHT_DELAY_MINUTES: u32 = 1;
+pub const MAX_AUTO_LIGHTWEIGHT_DELAY_MINUTES: u32 = 1440;
+pub const DEFAULT_AUTO_LIGHTWEIGHT_DELAY_MINUTES: u32 = 10;
+
+fn default_auto_lightweight_delay_minutes() -> u32 {
+    DEFAULT_AUTO_LIGHTWEIGHT_DELAY_MINUTES
+}
+
 fn default_show_profile_switcher() -> bool {
     true
 }
@@ -507,6 +521,8 @@ impl Default for AppSettings {
         Self {
             show_in_tray: true,
             minimize_to_tray_on_close: true,
+            auto_lightweight_mode: false,
+            auto_lightweight_delay_minutes: DEFAULT_AUTO_LIGHTWEIGHT_DELAY_MINUTES,
             use_app_window_controls: false,
             enable_claude_plugin_integration: false,
             skip_claude_onboarding: false,
@@ -562,6 +578,15 @@ impl AppSettings {
                 .join(".cc-switch")
                 .join("settings.json"),
         )
+    }
+
+    fn normalize(&mut self) {
+        self.auto_lightweight_delay_minutes = self.auto_lightweight_delay_minutes.clamp(
+            MIN_AUTO_LIGHTWEIGHT_DELAY_MINUTES,
+            MAX_AUTO_LIGHTWEIGHT_DELAY_MINUTES,
+        );
+
+        self.normalize_paths();
     }
 
     fn normalize_paths(&mut self) {
@@ -643,7 +668,7 @@ impl AppSettings {
         if let Ok(content) = fs::read_to_string(&path) {
             match serde_json::from_str::<AppSettings>(&content) {
                 Ok(mut settings) => {
-                    settings.normalize_paths();
+                    settings.normalize();
                     settings
                 }
                 Err(err) => {
@@ -663,7 +688,7 @@ impl AppSettings {
 
 fn save_settings_file(settings: &AppSettings) -> Result<(), AppError> {
     let mut normalized = settings.clone();
-    normalized.normalize_paths();
+    normalized.normalize();
     let Some(path) = AppSettings::settings_path() else {
         return Err(AppError::Config("无法获取用户主目录".to_string()));
     };
@@ -746,7 +771,7 @@ pub fn get_settings_for_frontend() -> AppSettings {
 }
 
 pub fn update_settings(mut new_settings: AppSettings) -> Result<(), AppError> {
-    new_settings.normalize_paths();
+    new_settings.normalize();
     save_settings_file(&new_settings)?;
 
     let mut guard = settings_store().write().unwrap_or_else(|e| {
@@ -767,7 +792,7 @@ where
     });
     let mut next = guard.clone();
     mutator(&mut next);
-    next.normalize_paths();
+    next.normalize();
     save_settings_file(&next)?;
     *guard = next;
     Ok(())
@@ -1147,6 +1172,38 @@ pub fn update_s3_sync_status(status: WebDavSyncStatus) -> Result<(), AppError> {
 mod tests {
     use super::*;
     use crate::app_config::AppType;
+
+    #[test]
+    fn old_settings_default_auto_lightweight_mode_to_disabled() {
+        let settings: AppSettings =
+            serde_json::from_value(serde_json::json!({})).expect("settings");
+
+        assert!(!settings.auto_lightweight_mode);
+        assert_eq!(
+            settings.auto_lightweight_delay_minutes,
+            DEFAULT_AUTO_LIGHTWEIGHT_DELAY_MINUTES
+        );
+    }
+
+    #[test]
+    fn normalize_clamps_auto_lightweight_delay() {
+        let mut settings = AppSettings {
+            auto_lightweight_delay_minutes: 0,
+            ..AppSettings::default()
+        };
+        settings.normalize();
+        assert_eq!(
+            settings.auto_lightweight_delay_minutes,
+            MIN_AUTO_LIGHTWEIGHT_DELAY_MINUTES
+        );
+
+        settings.auto_lightweight_delay_minutes = u32::MAX;
+        settings.normalize();
+        assert_eq!(
+            settings.auto_lightweight_delay_minutes,
+            MAX_AUTO_LIGHTWEIGHT_DELAY_MINUTES
+        );
+    }
 
     #[test]
     fn visible_apps_old_settings_default_claude_desktop_visible() {
