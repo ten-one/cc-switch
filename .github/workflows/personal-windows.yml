@@ -1,0 +1,103 @@
+name: Personal Windows Build
+
+on:
+  push:
+    branches: [personal]
+  pull_request:
+    branches: [personal]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: personal-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-and-build:
+    name: Test and build Windows x64 MSI
+    runs-on: windows-2022
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.12.3
+          run_install: false
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-personal-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-personal-cargo-
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript type check
+        run: pnpm typecheck
+
+      - name: Check frontend formatting
+        run: pnpm format:check
+
+      - name: Run frontend tests
+        run: pnpm test:unit
+
+      - name: Check Rust formatting
+        run: cargo fmt --check --manifest-path src-tauri/Cargo.toml
+
+      - name: Run Clippy
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+
+      - name: Run Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Build Windows x64 MSI
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $configPath = Join-Path $env:RUNNER_TEMP 'tauri-windows-ci.json'
+          Set-Content -LiteralPath $configPath -Value '{"bundle":{"createUpdaterArtifacts":false}}' -Encoding utf8
+          pnpm tauri build --target x86_64-pc-windows-msvc --bundles msi --config $configPath --ci
+
+      - name: Create checksum
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $bundlePath = 'src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi'
+          $msi = Get-ChildItem -LiteralPath $bundlePath -Filter '*.msi' -File | Select-Object -First 1
+          if ($null -eq $msi) {
+            throw "No MSI found in $bundlePath"
+          }
+          $hash = (Get-FileHash -LiteralPath $msi.FullName -Algorithm SHA256).Hash
+          "$hash  $($msi.Name)" | Set-Content -LiteralPath (Join-Path $bundlePath 'SHA256SUMS.txt') -Encoding utf8
+
+      - name: Upload Windows MSI artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: CC-Switch-Windows-x64-${{ github.sha }}
+          path: |
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
