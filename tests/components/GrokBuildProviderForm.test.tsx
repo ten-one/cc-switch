@@ -38,6 +38,9 @@ describe("GrokBuildProviderForm", () => {
     expect(screen.queryByRole("button", { name: /BytePlus/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Kimi/ })).toBeNull();
 
+    await user.click(
+      screen.getByRole("button", { name: "providerPreset.label" }),
+    );
     await user.click(screen.getByRole("button", { name: /PatewayAI/ }));
 
     const baseUrlInput =
@@ -110,6 +113,9 @@ describe("GrokBuildProviderForm", () => {
       />,
     );
 
+    await user.click(
+      screen.getByRole("button", { name: "providerPreset.label" }),
+    );
     await user.click(screen.getByRole("button", { name: /APIKEY\.FUN/ }));
     await user.type(screen.getByLabelText("API Key"), "secret-key");
     await user.click(screen.getByRole("button", { name: "Save" }));
